@@ -1,0 +1,57 @@
+#pragma code_page(65001)
+#include <windows.h>
+#include "resource.h"
+
+// Embed the app icon automatically when the optional 32x32 Fuchidori.ico is present.
+#ifdef FUCHIDORI_HAS_ICON
+IDR_MAINFRAME ICON "src\\Fuchidori.ico"
+#endif
+
+IDR_MAINFRAME MENU
+BEGIN
+    POPUP "ファイル(&F)"
+    BEGIN
+        MENUITEM "画像を開く(&O)...", ID_FILE_OPEN
+        MENUITEM "名前を付けて保存(&S)...", ID_FILE_SAVEAS
+        MENUITEM SEPARATOR
+        MENUITEM "終了(&X)", ID_FILE_EXIT
+    END
+    POPUP "編集(&E)"
+    BEGIN
+        MENUITEM "元に戻す(&U)\tCtrl+Z", ID_EDIT_UNDO
+        MENUITEM "やり直し(&R)\tCtrl+Y", ID_EDIT_REDO
+    END
+END
+
+IDD_TEXT_DIALOG DIALOGEX 0, 0, 430, 286
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_WINDOWEDGE
+CAPTION "文字の設定"
+FONT 9, "Yu Gothic UI"
+BEGIN
+    LTEXT           "文字", -1, 8, 7, 35, 12
+    PUSHBUTTON      "文字をクリア", IDC_CLEAR_TEXT, 326, 3, 96, 17
+    EDITTEXT        IDC_TEXT_INPUT, 8, 22, 414, 55, ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP | WS_BORDER
+
+    LTEXT           "フォント", -1, 8, 82, 45, 12
+    COMBOBOX        IDC_FONT_NAME, 8, 97, 230, 120, CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "サイズ(pt)", -1, 250, 82, 60, 12
+    EDITTEXT        IDC_FONT_SIZE, 316, 97, 52, 14, ES_AUTOHSCROLL | WS_TABSTOP | WS_BORDER
+
+    CONTROL         "太字", IDC_BOLD, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 126, 55, 14
+    CONTROL         "斜体", IDC_ITALIC, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 72, 126, 55, 14
+    CONTROL         "縦書き", IDC_VERTICAL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 145, 126, 70, 14
+
+    PUSHBUTTON      "文字色", IDC_FILL_COLOR, 8, 151, 130, 23
+    LTEXT           "縁取り", -1, 145, 156, 45, 12
+    COMBOBOX        IDC_OUTLINE_MODE, 192, 151, 120, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "縁取り色", IDC_OUTLINE_COLOR, 318, 151, 104, 23
+
+    LTEXT           "縁取り幅(px)", -1, 8, 185, 74, 12
+    EDITTEXT        IDC_OUTLINE_WIDTH, 84, 182, 54, 16, ES_AUTOHSCROLL | WS_TABSTOP | WS_BORDER
+    PUSHBUTTON      "影の色", IDC_SHADOW_COLOR, 151, 180, 130, 23
+
+    LTEXT           "画像上の別の場所をクリックすると、プレビュー位置が移動します。", IDC_POSITION_HINT, 8, 215, 414, 18
+    DEFPUSHBUTTON   "OK", IDOK, 250, 249, 78, 25
+    PUSHBUTTON      "キャンセル", IDCANCEL, 338, 249, 84, 25
+END

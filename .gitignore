@@ -1,0 +1,17 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+*.aps
+
+# Build output
+bin/
+obj/
+x64/
+Debug/
+Release/
+
+# User-specific application settings
+Fuchidori.ini
