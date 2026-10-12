@@ -4,6 +4,13 @@
 
 C++ / ATL / WTL で実装し、描画には Direct2D・DirectWrite、画像の読み書きには WIC を使用しています。
 
+## ダウンロード
+
+最新バージョンは [GitHub Releases](https://github.com/pirozhki/Fuchidori/releases/latest) からダウンロードできます。
+
+- [Fuchidori v1.0.0（ZIP）](https://github.com/pirozhki/Fuchidori/releases/download/v1.0.0/Fuchidori-v1.0.0.zip)
+- [すべてのリリースを見る](https://github.com/pirozhki/Fuchidori/releases)
+
 ## スクリーンショット
 
 ![Fuchidori の画面](screenshots/fuchidori.png)
