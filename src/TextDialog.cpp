@@ -19,36 +19,14 @@ namespace
         return static_cast<float>(value);
     }
 
-    std::wstring ExecutableIniPath()
-    {
-        wchar_t path[MAX_PATH] = {};
-        const DWORD len = GetModuleFileNameW(nullptr, path, _countof(path));
-        if (len == 0 || len >= _countof(path))
-            return L"Fuchidori.ini";
-
-        std::wstring result(path, len);
-        const size_t slash = result.find_last_of(L"\\/");
-        if (slash != std::wstring::npos)
-            result.resize(slash + 1);
-        else
-            result.clear();
-        result += L"Fuchidori.ini";
-        return result;
-    }
 }
 
-void CTextDialog::SetPosition(float x, float y)
+TextItem CTextDialog::GetCurrentItem()
 {
-    m_x = x;
-    m_y = y;
-    if (m_owner)
-        m_owner->OnTextDialogChanged();
-}
+    if (!IsWindow())
+        return m_settings;
 
-TextItem CTextDialog::GetCurrentItem() const
-{
     TextItem item = m_settings;
-
     wchar_t text[8192] = {};
     ::GetDlgItemTextW(m_hWnd, IDC_TEXT_INPUT, text, static_cast<int>(_countof(text)));
     item.text = text;
@@ -70,66 +48,73 @@ TextItem CTextDialog::GetCurrentItem() const
     if (index < 0 || index > 4)
         index = static_cast<LRESULT>(m_settings.outlineMode);
     item.outlineMode = static_cast<OutlineMode>(index);
-    item.x = m_x;
-    item.y = m_y;
+
+    m_settings = item;
     return item;
 }
 
-std::wstring CTextDialog::GetIniPath() const
+TextItem CTextDialog::GetDefaultItem(const std::wstring& text) const
 {
-    return ExecutableIniPath();
+    TextItem item = m_defaults;
+    item.text = text;
+    item.x = 0.0f;
+    item.y = 0.0f;
+    return item;
 }
 
-COLORREF CTextDialog::ReadColor(const wchar_t* key, COLORREF fallback) const
+void CTextDialog::SetCurrentItem(const TextItem& item)
 {
-    wchar_t buffer[32] = {};
-    const std::wstring path = GetIniPath();
-    wchar_t defaultHex[16] = {};
-    swprintf_s(defaultHex, L"%06X", static_cast<unsigned int>(fallback & 0x00FFFFFF));
-    GetPrivateProfileStringW(L"Text", key, defaultHex, buffer, _countof(buffer), path.c_str());
-    wchar_t* end = nullptr;
-    const unsigned long value = wcstoul(buffer, &end, 16);
-    if (end == buffer)
-        return fallback;
-    return static_cast<COLORREF>(value & 0x00FFFFFF);
-}
+    m_settings = item;
+    if (!IsWindow())
+        return;
 
-void CTextDialog::WriteColor(const wchar_t* key, COLORREF color) const
-{
-    wchar_t buffer[16] = {};
-    swprintf_s(buffer, L"%06X", static_cast<unsigned int>(color & 0x00FFFFFF));
-    const std::wstring path = GetIniPath();
-    WritePrivateProfileStringW(L"Text", key, buffer, path.c_str());
-}
+    m_updatingControls = true;
+    ::SetDlgItemTextW(m_hWnd, IDC_TEXT_INPUT, item.text.c_str());
 
-void CTextDialog::LoadSettings()
-{
-    const std::wstring path = GetIniPath();
-    wchar_t font[LF_FACESIZE * 4] = L"Segoe UI";
-    GetPrivateProfileStringW(L"Text", L"FontName", L"Segoe UI", font, _countof(font), path.c_str());
-    m_settings.fontName = font;
+    ::SetDlgItemTextW(m_hWnd, IDC_FONT_NAME, item.fontName.c_str());
+    const LRESULT fontIndex = ::SendDlgItemMessageW(m_hWnd, IDC_FONT_NAME,
+        CB_FINDSTRINGEXACT, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(item.fontName.c_str()));
+    if (fontIndex != CB_ERR)
+        ::SendDlgItemMessageW(m_hWnd, IDC_FONT_NAME, CB_SETCURSEL, static_cast<WPARAM>(fontIndex), 0);
 
     wchar_t number[64] = {};
-    GetPrivateProfileStringW(L"Text", L"FontSizePt", L"48", number, _countof(number), path.c_str());
-    m_settings.fontSizePt = static_cast<float>(_wtof(number));
-    if (m_settings.fontSizePt < 1.0f || m_settings.fontSizePt > 300.0f)
-        m_settings.fontSizePt = 48.0f;
-
-    m_settings.bold = GetPrivateProfileIntW(L"Text", L"Bold", 1, path.c_str()) != 0;
-    m_settings.italic = GetPrivateProfileIntW(L"Text", L"Italic", 0, path.c_str()) != 0;
-    m_settings.vertical = GetPrivateProfileIntW(L"Text", L"Vertical", 0, path.c_str()) != 0;
-    m_settings.fillColor = ReadColor(L"FillColor", RGB(255, 255, 255));
-    m_settings.outlineColor = ReadColor(L"OutlineColor", RGB(0, 0, 0));
-    m_settings.shadowColor = ReadColor(L"ShadowColor", RGB(0, 0, 0));
-    int outlineMode = GetPrivateProfileIntW(L"Text", L"OutlineMode", 1, path.c_str());
-    outlineMode = (std::max)(0, (std::min)(4, outlineMode));
-    m_settings.outlineMode = static_cast<OutlineMode>(outlineMode);
-
-    GetPrivateProfileStringW(L"Text", L"OutlineWidth", L"3", number, _countof(number), path.c_str());
-    m_settings.outlineWidth = static_cast<float>(_wtof(number));
-    if (m_settings.outlineWidth < 0.5f || m_settings.outlineWidth > 20.0f)
-        m_settings.outlineWidth = 3.0f;
+    swprintf_s(number, L"%.1f", item.fontSizePt);
+    ::SetDlgItemTextW(m_hWnd, IDC_FONT_SIZE, number);
+    swprintf_s(number, L"%.1f", item.outlineWidth);
+    ::SetDlgItemTextW(m_hWnd, IDC_OUTLINE_WIDTH, number);
+    ::CheckDlgButton(m_hWnd, IDC_BOLD, item.bold ? BST_CHECKED : BST_UNCHECKED);
+    ::CheckDlgButton(m_hWnd, IDC_ITALIC, item.italic ? BST_CHECKED : BST_UNCHECKED);
+    ::CheckDlgButton(m_hWnd, IDC_VERTICAL, item.vertical ? BST_CHECKED : BST_UNCHECKED);
+    ::SendDlgItemMessageW(m_hWnd, IDC_OUTLINE_MODE, CB_SETCURSEL,
+        static_cast<WPARAM>(item.outlineMode), 0);
+    UpdateColorButtonText(IDC_FILL_COLOR, item.fillColor);
+    UpdateColorButtonText(IDC_OUTLINE_COLOR, item.outlineColor);
+    UpdateColorButtonText(IDC_SHADOW_COLOR, item.shadowColor);
+    m_updatingControls = false;
 }
+
+void CTextDialog::ResetToDefaults(const std::wstring& text)
+{
+    SetCurrentItem(GetDefaultItem(text));
+}
+
+void CTextDialog::UpdateDefaultsFromCurrentItem(const TextItem& item)
+{
+    m_defaults = item;
+    m_defaults.text.clear();
+    m_defaults.x = 0.0f;
+    m_defaults.y = 0.0f;
+}
+
+void CTextDialog::UpdateActionButtons(bool hasSelection, bool hasPending)
+{
+    if (!IsWindow())
+        return;
+    ::EnableWindow(::GetDlgItem(m_hWnd, IDC_COMMIT_SELECTED), hasSelection ? TRUE : FALSE);
+    ::EnableWindow(::GetDlgItem(m_hWnd, IDC_COMMIT_ALL), hasPending ? TRUE : FALSE);
+    ::EnableWindow(::GetDlgItem(m_hWnd, IDC_DELETE_SELECTED), hasSelection ? TRUE : FALSE);
+}
+
 
 int CALLBACK CTextDialog::EnumFontProc(const LOGFONTW* lf, const TEXTMETRICW*, DWORD, LPARAM context)
 {
@@ -175,7 +160,6 @@ void CTextDialog::UpdateColorButtonText(int controlId, COLORREF color)
 
 LRESULT CTextDialog::OnInitDialog(UINT, WPARAM, LPARAM, BOOL&)
 {
-    LoadSettings();
     PopulateFonts();
 
     const wchar_t* outlineOptions[] = {
@@ -184,22 +168,44 @@ LRESULT CTextDialog::OnInitDialog(UINT, WPARAM, LPARAM, BOOL&)
     for (const wchar_t* option : outlineOptions)
         ::SendDlgItemMessageW(m_hWnd, IDC_OUTLINE_MODE, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(option));
 
-    ::SetDlgItemTextW(m_hWnd, IDC_FONT_NAME, m_settings.fontName.c_str());
-    wchar_t number[64] = {};
-    swprintf_s(number, L"%.1f", m_settings.fontSizePt);
-    ::SetDlgItemTextW(m_hWnd, IDC_FONT_SIZE, number);
-    swprintf_s(number, L"%.1f", m_settings.outlineWidth);
-    ::SetDlgItemTextW(m_hWnd, IDC_OUTLINE_WIDTH, number);
-    ::CheckDlgButton(m_hWnd, IDC_BOLD, m_settings.bold ? BST_CHECKED : BST_UNCHECKED);
-    ::CheckDlgButton(m_hWnd, IDC_ITALIC, m_settings.italic ? BST_CHECKED : BST_UNCHECKED);
-    ::CheckDlgButton(m_hWnd, IDC_VERTICAL, m_settings.vertical ? BST_CHECKED : BST_UNCHECKED);
-    ::SendDlgItemMessageW(m_hWnd, IDC_OUTLINE_MODE, CB_SETCURSEL, static_cast<WPARAM>(m_settings.outlineMode), 0);
-    UpdateColorButtonText(IDC_FILL_COLOR, m_settings.fillColor);
-    UpdateColorButtonText(IDC_OUTLINE_COLOR, m_settings.outlineColor);
-    UpdateColorButtonText(IDC_SHADOW_COLOR, m_settings.shadowColor);
-    // Restore the last text from memory (never from the INI file).
-    ::SetDlgItemTextW(m_hWnd, IDC_TEXT_INPUT, m_lastText.c_str());
-    CenterWindow(GetParent());
+    SetCurrentItem(m_defaults);
+
+    // Place the tool window beside the main frame when screen space permits,
+    // keeping as much of the image canvas unobstructed as possible.
+    RECT ownerRect = {};
+    RECT dialogRect = {};
+    RECT workArea = {};
+    HWND owner = GetParent();
+    if (owner && ::GetWindowRect(owner, &ownerRect) && ::GetWindowRect(m_hWnd, &dialogRect))
+    {
+        HMONITOR monitor = ::MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO monitorInfo = {};
+        monitorInfo.cbSize = sizeof(monitorInfo);
+        if (monitor && ::GetMonitorInfoW(monitor, &monitorInfo))
+            workArea = monitorInfo.rcWork;
+        else
+            ::SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
+
+        const int dialogWidth = dialogRect.right - dialogRect.left;
+        const int dialogHeight = dialogRect.bottom - dialogRect.top;
+        int x = ownerRect.right + 8;
+        if (x + dialogWidth > workArea.right)
+            x = ownerRect.left - dialogWidth - 8;
+        if (x < workArea.left)
+            x = workArea.right - dialogWidth;
+        int y = ownerRect.top + 32;
+        if (y + dialogHeight > workArea.bottom)
+            y = workArea.bottom - dialogHeight;
+        if (y < workArea.top)
+            y = workArea.top;
+        ::SetWindowPos(m_hWnd, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    else
+    {
+        CenterWindow(owner);
+    }
+
+    UpdateActionButtons(false, false);
     return TRUE;
 }
 
@@ -221,13 +227,12 @@ void CTextDialog::ChooseColorFor(int controlId)
     if (ChooseColorW(&cc))
     {
         if (controlId == IDC_FILL_COLOR)
-            m_settings.fillColor = cc.rgbResult;
+            current.fillColor = cc.rgbResult;
         else if (controlId == IDC_OUTLINE_COLOR)
-            m_settings.outlineColor = cc.rgbResult;
+            current.outlineColor = cc.rgbResult;
         else
-            m_settings.shadowColor = cc.rgbResult;
-
-        UpdateColorButtonText(controlId, cc.rgbResult);
+            current.shadowColor = cc.rgbResult;
+        SetCurrentItem(current);
         if (m_owner)
             m_owner->OnTextDialogChanged();
     }
@@ -235,26 +240,34 @@ void CTextDialog::ChooseColorFor(int controlId)
 
 LRESULT CTextDialog::OnCommand(UINT, WPARAM wParam, LPARAM, BOOL&)
 {
+    if (m_updatingControls)
+        return 0;
+
     const int id = LOWORD(wParam);
     const int notification = HIWORD(wParam);
 
-    if (id == IDOK)
+    if (id == IDC_COMMIT_SELECTED && notification == BN_CLICKED)
     {
-        CloseDialog(true);
+        if (m_owner)
+            m_owner->CommitSelectedText();
+        return 0;
+    }
+    if (id == IDC_COMMIT_ALL && notification == BN_CLICKED)
+    {
+        if (m_owner)
+            m_owner->CommitAllPendingTexts();
+        return 0;
+    }
+    if (id == IDC_DELETE_SELECTED && notification == BN_CLICKED)
+    {
+        if (m_owner)
+            m_owner->DeleteSelectedObject();
         return 0;
     }
     if (id == IDCANCEL)
     {
-        CloseDialog(false);
-        return 0;
-    }
-    if (id == IDC_CLEAR_TEXT && notification == BN_CLICKED)
-    {
-        ::SetDlgItemTextW(m_hWnd, IDC_TEXT_INPUT, L"");
-        m_lastText.clear();
         if (m_owner)
-            m_owner->OnTextDialogChanged();
-        ::SetFocus(::GetDlgItem(m_hWnd, IDC_TEXT_INPUT));
+            m_owner->DeselectSelectedObject();
         return 0;
     }
     if (notification == BN_CLICKED &&
@@ -264,10 +277,8 @@ LRESULT CTextDialog::OnCommand(UINT, WPARAM wParam, LPARAM, BOOL&)
         return 0;
     }
 
-    if (id == IDC_FONT_NAME && notification == CBN_SELCHANGE)
-    {
-        // Selection changes are handled like other preview-affecting settings.
-    }
+    // Edit controls, font selection, check boxes and outline-mode changes all
+    // update either the selected object or the defaults for future objects.
     if (m_owner)
         m_owner->OnTextDialogChanged();
     return 0;
@@ -275,54 +286,16 @@ LRESULT CTextDialog::OnCommand(UINT, WPARAM wParam, LPARAM, BOOL&)
 
 LRESULT CTextDialog::OnClose(UINT, WPARAM, LPARAM, BOOL&)
 {
-    CloseDialog(false);
+    // This tool window stays available throughout the editing session.
+    // It is destroyed explicitly when the main frame exits.
+    if (IsWindow())
+        ShowWindow(SW_SHOWNORMAL);
     return 0;
 }
 
-void CTextDialog::SaveSettings()
-{
-    if (IsWindow())
-        m_settings = GetCurrentItem();
-
-    const std::wstring path = GetIniPath();
-    WritePrivateProfileStringW(L"Text", L"FontName", m_settings.fontName.c_str(), path.c_str());
-    wchar_t number[64] = {};
-    swprintf_s(number, L"%.2f", m_settings.fontSizePt);
-    WritePrivateProfileStringW(L"Text", L"FontSizePt", number, path.c_str());
-    WritePrivateProfileStringW(L"Text", L"Bold", m_settings.bold ? L"1" : L"0", path.c_str());
-    WritePrivateProfileStringW(L"Text", L"Italic", m_settings.italic ? L"1" : L"0", path.c_str());
-    WritePrivateProfileStringW(L"Text", L"Vertical", m_settings.vertical ? L"1" : L"0", path.c_str());
-    WriteColor(L"FillColor", m_settings.fillColor);
-    WriteColor(L"OutlineColor", m_settings.outlineColor);
-    WriteColor(L"ShadowColor", m_settings.shadowColor);
-    swprintf_s(number, L"%d", static_cast<int>(m_settings.outlineMode));
-    WritePrivateProfileStringW(L"Text", L"OutlineMode", number, path.c_str());
-    swprintf_s(number, L"%.2f", m_settings.outlineWidth);
-    WritePrivateProfileStringW(L"Text", L"OutlineWidth", number, path.c_str());
-}
-
-void CTextDialog::CloseDialog(bool accepted)
-{
-    if (!IsWindow())
-        return;
-
-    TextItem item = GetCurrentItem();
-    // Preserve the typed text across dialog openings, even after Undo or Cancel.
-    // This value is session-only and is not persisted to the INI file.
-    m_lastText = item.text;
-    SaveSettings();
-    if (accepted && m_owner && !item.text.empty())
-        m_owner->OnTextAccepted(item, m_x, m_y);
-
-    HWND oldWindow = m_hWnd;
-    DestroyWindow();
-    if (m_owner)
-        m_owner->OnTextDialogClosed(this);
-    (void)oldWindow;
-}
 
 void CTextDialog::ForceClose()
 {
     if (IsWindow())
-        CloseDialog(false);
+        DestroyWindow();
 }

@@ -20,5 +20,11 @@
 #define IDC_OUTLINE_WIDTH          1009
 #define IDC_SHADOW_COLOR           1010
 #define IDC_POSITION_HINT          1011
-#define IDC_CLEAR_TEXT             1012
 #define IDC_VERTICAL               1013
+
+#define IDC_COMMIT_SELECTED         1014
+#define IDC_COMMIT_ALL              1015
+#define IDC_DELETE_SELECTED          1016
+
+#define ID_OBJECT_COMMIT             40006
+#define ID_OBJECT_DELETE             40007
